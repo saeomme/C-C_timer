@@ -312,11 +312,6 @@ body.m-notice .m-dim{opacity:.25}
 .seg-pick{display:flex;border:1px solid var(--line);flex:none}
 .seg-pick button{padding:8px 12px;font-size:12.5px;font-weight:700;color:var(--paper-3)}
 .seg-pick button.on{background:var(--paper);color:var(--ink)}
-.p-save{background:var(--flag);color:var(--ink);padding:9px 14px;font-size:14px;font-weight:800}
-.p-chip{display:inline-flex;align-items:center;background:var(--ink-2);border:1px solid var(--line);
-  padding:0 0 0 12px;font-size:14px;margin:0 6px 6px 0}
-.p-chip .ld{padding:9px 4px;font-weight:700}
-.p-chip .dl{width:30px;height:34px;color:var(--paper-3);font-size:13px}
 .m-done-sum{display:flex;flex-direction:column;gap:6px;background:var(--ink-2);padding:18px;
   font-family:var(--mono);font-size:15px;color:var(--paper-2);flex:none;margin-top:20px;
   font-variant-numeric:tabular-nums}
@@ -433,13 +428,12 @@ body.m-notice .m-dim{opacity:.25}
 
   <!-- C 설정 -->
   <div class="mscreen" id="mSet">
-    <div class="m-top">
-      <div style="display:flex;align-items:center;gap:12px">
-        <button id="sBack" style="font-size:22px;color:var(--paper-2);padding:4px 6px 4px 0">‹</button>
-        <div class="ttl">설정</div>
+      <div class="m-top">
+        <div style="display:flex;align-items:center;gap:12px">
+          <button id="sBack" style="font-size:22px;color:var(--paper-2);padding:4px 6px 4px 0">‹</button>
+          <div class="ttl">설정</div>
+        </div>
       </div>
-      <button class="p-save" id="sSave">프리셋 저장</button>
-    </div>
     <div class="m-tabs" id="sTabs" style="margin-top:18px">
       <button data-t="stage" class="on">단계</button>
       <button data-t="notice">공지</button>
@@ -484,16 +478,30 @@ body.m-notice .m-dim{opacity:.25}
         <input type="number" class="o-num" id="oWarnMin" min="1" max="60"><span class="o-note">분 전</span></div>
       <div class="o-row"><label for="oSec">공지 표시 시간</label>
         <input type="number" class="o-num" id="oSec" min="3" max="120"><span class="o-note">초</span></div>
-      <div class="o-row" style="flex-direction:column;align-items:stretch;gap:8px">
-        <div style="font-size:12px;font-weight:700;color:var(--paper-3);letter-spacing:.06em">저장된 프리셋</div>
-        <div id="pList"></div>
-      </div>
     </div>
   </div>
 </div>
 
 <script>
 'use strict';
+/*!ver:2026-08-10a*/
+/* ─────────────────────────────────────────────
+   배포할 때마다 아래 VERSION 값과 위 주석의 ver: 값을
+   똑같이 바꾸세요. 두 값이 서버와 다르면 앱이 스스로
+   새 버전을 감지해서 다시 불러옵니다.
+   ───────────────────────────────────────────── */
+const VERSION='2026-08-10a';
+
+async function checkUpdate(){
+  try{
+    const r=await fetch(location.pathname+'?cb='+Date.now(),{cache:'no-store'});
+    if(!r.ok)return;
+    const m=(await r.text()).match(/\/\*!ver:([^*]+)\*\//);
+    if(!m||m[1]===VERSION)return;
+    if(R.status==='running'||R.status==='paused')return; // 진행 중엔 건드리지 않는다
+    location.replace(location.pathname+'?v='+encodeURIComponent(m[1]));
+  }catch(e){}
+}
 const $=s=>document.querySelector(s);
 const el=(t,c,h)=>{const d=document.createElement(t);if(c)d.className=c;if(h!=null)d.innerHTML=h;return d};
 const GC=['--g1','--g2','--g3','--g4','--g5'];
@@ -502,8 +510,8 @@ const color=i=>cvar(GC[i%5]);
 
 const DEFAULT={
   title:'실기 타이머',
-  stages:[{name:'구상',min:20},{name:'스케치',min:40},{name:'밑색',min:60},
-          {name:'묘사',min:90},{name:'마무리',min:30}],
+  stages:[{name:'스케치',min:40},{name:'밑색',min:90},
+          {name:'묘사',min:90},{name:'마무리',min:20}],
   notices:[
     {basis:'left',min:120,text:'절반 지났습니다. 멀리 떨어져서 화면 전체를 보세요'},
     {basis:'left',min:60,text:'1시간 남았습니다'},
@@ -787,25 +795,6 @@ $('#sTabs').onclick=e=>{
   $('#paneOpt').classList.toggle('on',curTab==='opt');
 };
 $('#sBack').onclick=()=>showScreen(R.status==='idle'?'mHome':'mRun');
-
-function renderPresets(){
-  const ps=load('sg_presets')||{},box=$('#pList');box.innerHTML='';
-  const keys=Object.keys(ps);
-  if(!keys.length){box.innerHTML='<div style="font-size:13px;color:var(--paper-3)">저장된 프리셋이 없습니다</div>';return}
-  keys.forEach(k=>{
-    const c=el('span','p-chip','<button class="ld"></button><button class="dl">✕</button>');
-    c.querySelector('.ld').textContent=k;
-    c.querySelector('.ld').onclick=()=>{S=hydrate(ps[k]);persist();syncAll();renderOpts();layout()};
-    c.querySelector('.dl').onclick=()=>{delete ps[k];store('sg_presets',ps);renderPresets()};
-    box.appendChild(c);
-  });
-}
-$('#sSave').onclick=()=>{
-  const n=(S.title||'프리셋').trim();
-  const name=prompt('프리셋 이름',n);if(!name)return;
-  const ps=load('sg_presets')||{};ps[name]=JSON.parse(JSON.stringify(S));
-  store('sg_presets',ps);renderPresets();
-};
 
 /* ══════ 실행 렌더 ══════ */
 function renderSteps(){
@@ -1119,7 +1108,7 @@ $('#tvFull').onclick=async()=>{
 function showScreen(id){
   ['mHome','mRun','mSet'].forEach(x=>$('#'+x).classList.toggle('on',x===id));
   if(id==='mRun')renderSteps();
-  if(id==='mSet'){renderSetStage();renderNotices();renderOpts();renderPresets()}
+  if(id==='mSet'){renderSetStage();renderNotices();renderOpts()}
 }
 
 document.addEventListener('keydown',e=>{
@@ -1135,7 +1124,8 @@ function syncAll(){
   if($('#mSet').classList.contains('on')){renderSetStage();renderNotices()}
   renderSteps();frame();
 }
-syncAll();renderOpts();renderPresets();layout();
+syncAll();renderOpts();layout();
+setTimeout(checkUpdate,1500);
 
 (function(){
   const r=load('sg_run');

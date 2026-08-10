@@ -474,8 +474,6 @@ body.m-notice .m-dim{opacity:.25}
         <div class="o-note" style="line-height:1.6" id="oBgNote"></div>
       </div>
       <div class="o-row"><input type="checkbox" id="oStage"><label for="oStage">단계 전환 자동 안내</label></div>
-      <div class="o-row"><input type="checkbox" id="oWarn"><label for="oWarn">단계 종료 전 미리 알림</label>
-        <input type="number" class="o-num" id="oWarnMin" min="1" max="60"><span class="o-note">분 전</span></div>
       <div class="o-row"><label for="oSec">공지 표시 시간</label>
         <input type="number" class="o-num" id="oSec" min="3" max="120"><span class="o-note">초</span></div>
     </div>
@@ -484,13 +482,13 @@ body.m-notice .m-dim{opacity:.25}
 
 <script>
 'use strict';
-/*!ver:2026-08-10a*/
+/*!ver:2026-08-10b*/
 /* ─────────────────────────────────────────────
    배포할 때마다 아래 VERSION 값과 위 주석의 ver: 값을
    똑같이 바꾸세요. 두 값이 서버와 다르면 앱이 스스로
    새 버전을 감지해서 다시 불러옵니다.
    ───────────────────────────────────────────── */
-const VERSION='2026-08-10a';
+const VERSION='2026-08-10b';
 
 async function checkUpdate(){
   try{
@@ -513,11 +511,10 @@ const DEFAULT={
   stages:[{name:'스케치',min:40},{name:'밑색',min:90},
           {name:'묘사',min:90},{name:'마무리',min:20}],
   notices:[
-    {basis:'left',min:120,text:'절반 지났습니다. 멀리 떨어져서 화면 전체를 보세요'},
     {basis:'left',min:60,text:'1시간 남았습니다'},
-    {basis:'left',min:30,text:'30분 남았습니다. 마무리 단계로 넘어가세요'},
-    {basis:'left',min:10,text:'10분 남았습니다. 이름과 수험번호 확인하세요'}],
-  opts:{autoStage:true,preWarn:true,warnMin:10,noticeSec:20,sound:true,vib:true,
+    {basis:'left',min:30,text:'30분 남았습니다'},
+    {basis:'left',min:10,text:'10분 남았습니다'}],
+  opts:{autoStage:true,noticeSec:20,sound:true,vib:true,
         display:'auto',bgMode:'auto'}
 };
 
@@ -595,10 +592,6 @@ function buildCues(){
   S.stages.forEach((st,i)=>{
     const d=st.min*60000;
     if(S.opts.autoStage&&i>0)list.push({t:acc,text:`${st.name} 단계 시작`,kind:'auto'});
-    if(S.opts.preWarn){
-      const w=acc+d-S.opts.warnMin*60000;
-      if(w>acc&&w<tot)list.push({t:w,text:`${st.name} ${S.opts.warnMin}분 남았습니다`,kind:'auto'});
-    }
     acc+=d;
   });
   list.sort((a,b)=>a.t-b.t);list.forEach(c=>c.fired=false);cues=list;
@@ -767,8 +760,7 @@ function renderOpts(){
     always:'시작할 때부터 오디오를 잡습니다. 가장 확실하지만 음악 앱이 멈춥니다.',
     off:'백그라운드 유지를 하지 않습니다. 화면이 꺼지면 공지 알림이 오지 않습니다.'
   }[S.opts.bgMode]||'';
-  $('#oStage').checked=S.opts.autoStage;$('#oWarn').checked=S.opts.preWarn;
-  $('#oWarnMin').value=S.opts.warnMin;$('#oSec').value=S.opts.noticeSec;
+  $('#oStage').checked=S.opts.autoStage;$('#oSec').value=S.opts.noticeSec;
   [...$('#oDisp').children].forEach(b=>b.classList.toggle('on',b.dataset.v===S.opts.display));
 }
 $('#oTitle').oninput=e=>{S.title=e.target.value;persist();renderHome()};
@@ -780,9 +772,9 @@ $('#oBgMode').onclick=e=>{
   if(R.status==='running')S.opts.bgMode==='always'?keeperPlay(true):keeperPlay(false);
 };
 $('#oStage').onchange=e=>{S.opts.autoStage=e.target.checked;persist();buildCues();buildRuler()};
-$('#oWarn').onchange=e=>{S.opts.preWarn=e.target.checked;persist();buildCues();buildRuler()};
-$('#oWarnMin').oninput=e=>{S.opts.warnMin=Math.max(1,+e.target.value||10);persist();buildCues();buildRuler()};
-$('#oSec').oninput=e=>{S.opts.noticeSec=Math.max(3,+e.target.value||20);persist()};
+$('#oSec').oninput=e=>{const v=+e.target.value;if(v>=3&&v<=120){S.opts.noticeSec=v;persist()}};
+$('#oSec').onblur=e=>{S.opts.noticeSec=Math.min(120,Math.max(3,+e.target.value||20));
+  e.target.value=S.opts.noticeSec;persist()};
 $('#oDisp').onclick=e=>{const b=e.target.closest('button');if(!b)return;
   S.opts.display=b.dataset.v;persist();renderOpts();layout()};
 
@@ -885,7 +877,6 @@ function frame(){
     }
     $('#rMainT').textContent=running?'일시정지':done?'다시':R.status==='paused'?'이어서':'시작';
     $('#rMain').querySelector('.bars').style.display=running?'flex':'none';
-    if(noticeTimer)$('#cdSec').textContent=Math.max(0,Math.ceil((noticeEnd-Date.now())/1000))+'초 후 닫힘';
   }
 
   if(running){
@@ -919,7 +910,7 @@ function showNext(){
   noticeTimer=setTimeout(hideNotice,S.opts.noticeSec*1000);
 }
 function hideNotice(){
-  clearTimeout(noticeTimer);noticeTimer=null;
+  clearTimeout(noticeTimer);noticeTimer=null;$('#cdSec').textContent='';
   $('#tvBanner').classList.remove('show');
   $('#mCard').classList.remove('show');
   document.body.classList.remove('m-notice','tv-notice');
@@ -1040,6 +1031,12 @@ setInterval(()=>{
   updateMedia();
   if(e>=tot)finish();
 },500);
+
+/* 공지 카드의 남은 초 — 화면 모드와 무관하게 갱신 */
+setInterval(()=>{
+  if(!noticeTimer)return;
+  $('#cdSec').textContent=Math.max(0,Math.ceil((noticeEnd-Date.now())/1000))+'초 후 닫힘';
+},250);
 
 document.addEventListener('visibilitychange',()=>{
   if(document.visibilityState!=='visible'){

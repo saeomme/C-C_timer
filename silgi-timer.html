@@ -551,12 +551,21 @@ function isTv(){
   if(S.opts.display==='phone')return false;
   return window.innerWidth>window.innerHeight;
 }
+/* 실행 상태에 맞는 모바일 화면을 맞춰둔다.
+   가로에서 시작한 뒤 세로로 돌려도 이어지도록. */
+function syncScreen(){
+  if($('#mSet').classList.contains('on'))return;
+  const want=R.status==='idle'?'mHome':'mRun';
+  if(!$('#'+want).classList.contains('on'))showScreen(want);
+}
 function layout(){
   const tv=isTv();
   document.body.classList.toggle('mode-tv',tv);
   document.body.classList.toggle('mode-phone',!tv);
   if(tv)$('#canvas').style.setProperty('--s',Math.min(innerWidth/1920,innerHeight/1080));
+  syncScreen();
   pokeCtl();
+  cancelAnimationFrame(raf);frame();
 }
 addEventListener('resize',layout);
 addEventListener('orientationchange',()=>setTimeout(layout,180));
@@ -1064,20 +1073,20 @@ function start(){
   const e=elapsed();cues.forEach(c=>c.fired=c.t<=e);
   R.status='running';R.resumedAt=Date.now();R.pauseStart=0;
   saveRun();keepAlive(true);updateMedia(true);
-  renderSteps();cancelAnimationFrame(raf);frame();
+  syncScreen();renderSteps();cancelAnimationFrame(raf);frame();
 }
 function pause(){
   if(R.status!=='running')return;
   R.base=elapsed();R.status='paused';R.pauseCount++;R.pauseStart=Date.now();
   cancelAnimationFrame(raf);saveRun();keepAlive(false);updateMedia(true);
-  renderSteps();frame();
+  syncScreen();renderSteps();frame();
 }
 function reset(){
   R={status:'idle',base:0,resumedAt:0,pauseCount:0,pausedMs:0,pauseStart:0,noticeCount:0};
   cancelAnimationFrame(raf);queue=[];hideNotice();keepAlive(false);
   buildCues();buildRuler();saveRun();renderSteps();frame();
   if('mediaSession'in navigator)try{navigator.mediaSession.playbackState='none'}catch(e){}
-  if(!isTv())showScreen('mHome');
+  syncScreen();
 }
 function finish(){
   if(R.status==='paused'&&R.pauseStart){R.pausedMs+=Date.now()-R.pauseStart;R.pauseStart=0}
@@ -1085,7 +1094,7 @@ function finish(){
   cancelAnimationFrame(raf);saveRun();
   play('end');buzz([400,150,400,150,400]);
   setTimeout(()=>keepAlive(false),3000);
-  updateMedia(true);renderSteps();frame();
+  updateMedia(true);syncScreen();renderSteps();frame();
 }
 const saveRun=()=>store('sg_run',{...R,at:Date.now()});
 const toggle=()=>{
